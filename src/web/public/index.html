@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Comunicação Segura - Alice & Bob</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>🔐 Sistema de Comunicação Segura</h1>
+        <p>Demonstração de Criptografia End-to-End - Alice & Bob</p>
+    </header>
+
+    <div class="container">
+        <!-- Painel Alice -->
+        <div class="user-panel alice-panel">
+            <div class="user-header">
+                <div class="avatar alice-avatar">A</div>
+                <div>
+                    <h2>Alice</h2>
+                    <span class="badge">Remetente</span>
+                </div>
+            </div>
+
+            <div class="message-box">
+                <label for="alice-message">Mensagem para Bob:</label>
+                <textarea
+                    id="alice-message"
+                    placeholder="Digite a mensagem secreta..."
+                    rows="4"
+                >Olá Bob! Esta é uma mensagem criptografada com segurança máxima. 🔐</textarea>
+            </div>
+
+            <div class="button-group">
+                <button id="send-alice-to-bob" class="btn btn-primary">
+                    📤 Enviar para Bob
+                </button>
+                <button id="send-bob-to-alice" class="btn btn-secondary">
+                    📥 Bob Responde
+                </button>
+            </div>
+
+            <div id="alice-status" class="status-box"></div>
+
+            <!-- Histórico de Mensagens de Alice -->
+            <div class="message-history">
+                <div class="history-header">
+                    <h4>💬 Histórico de Mensagens</h4>
+                    <button id="clear-alice-history" class="btn btn-small">Limpar Histórico</button>
+                </div>
+                <div id="alice-message-list" class="history-list"></div>
+            </div>
+        </div>
+
+        <!-- Painel Bob -->
+        <div class="user-panel bob-panel">
+            <div class="user-header">
+                <div class="avatar bob-avatar">B</div>
+                <div>
+                    <h2>Bob</h2>
+                    <span class="badge">Destinatário</span>
+                </div>
+            </div>
+
+            <div class="message-box">
+                <label for="bob-message">Resposta para Alice:</label>
+                <textarea
+                    id="bob-message"
+                    placeholder="Digite a resposta..."
+                    rows="4"
+                >Olá Alice! Recebi sua mensagem com segurança. Tudo verificado! ✓</textarea>
+            </div>
+
+            <div class="button-group">
+                <button id="receive-bob" class="btn btn-success" disabled>
+                    📨 Receber Mensagem
+                </button>
+                <button id="tamper-message" class="btn btn-danger" disabled>
+                    ⚠️ Simular Ataque
+                </button>
+            </div>
+
+            <div id="bob-status" class="status-box"></div>
+
+            <!-- Histórico de Mensagens de Bob -->
+            <div class="message-history">
+                <div class="history-header">
+                    <h4>💬 Histórico de Mensagens</h4>
+                    <button id="clear-bob-history" class="btn btn-small">Limpar Histórico</button>
+                </div>
+                <div id="bob-message-list" class="history-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seção de Validações -->
+    <div class="validations-container" id="validations-container" style="display: none;">
+        <h3>🔍 Validações de Segurança</h3>
+        <div class="validations-grid">
+            <div class="validation-item" id="cert-validation">
+                <span class="validation-icon">⏳</span>
+                <span class="validation-text">Certificado Digital</span>
+            </div>
+            <div class="validation-item" id="sig-validation">
+                <span class="validation-icon">⏳</span>
+                <span class="validation-text">Assinatura Digital</span>
+            </div>
+            <div class="validation-item" id="integrity-validation">
+                <span class="validation-icon">⏳</span>
+                <span class="validation-text">Integridade (Hash)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Painel de Logs -->
+    <div class="logs-container">
+        <div class="logs-header">
+            <h3>📋 Logs de Comunicação</h3>
+            <button id="clear-logs" class="btn btn-small">Limpar Logs</button>
+        </div>
+        <div id="logs" class="logs-content">
+            <div class="log-item info">
+                <span class="log-time">--:--:--</span>
+                <span class="log-message">Sistema pronto. Alice e Bob aguardando comunicação...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rodapé -->
+    <footer>
+        <p>
+            <strong>Conceitos:</strong>
+            SHA-256 (Hash) • AES-256-CBC (Simétrica) • RSA-2048 (Assimétrica) •
+            Assinatura Digital • Certificado Digital
+        </p>
+        <button id="reset-system" class="btn btn-small">🔄 Reiniciar Sistema</button>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
