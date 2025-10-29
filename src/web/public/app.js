@@ -6,13 +6,17 @@
 let currentMessagePackage = null;
 let currentRecipient = null;
 
+// Histórico de mensagens
+const messageHistory = {
+  Alice: [],
+  Bob: []
+};
+
 // Elementos do DOM
 const aliceMessage = document.getElementById('alice-message');
 const bobMessage = document.getElementById('bob-message');
 const sendAliceToBobBtn = document.getElementById('send-alice-to-bob');
 const sendBobToAliceBtn = document.getElementById('send-bob-to-alice');
-const receiveBobBtn = document.getElementById('receive-bob');
-const tamperMessageBtn = document.getElementById('tamper-message');
 const clearLogsBtn = document.getElementById('clear-logs');
 const resetSystemBtn = document.getElementById('reset-system');
 const logsContainer = document.getElementById('logs');
@@ -86,6 +90,201 @@ function hideValidations() {
     validationsContainer.style.display = 'none';
 }
 
+// === Funções de Histórico de Mensagens ===
+
+// Adiciona mensagem ao histórico
+function addToMessageHistory(user, direction, plaintext, messagePackage, validations = {}) {
+    const messageItem = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        direction: direction, // 'sent' ou 'received'
+        plaintext: plaintext,
+        timestamp: new Date().toISOString(),
+        from: messagePackage.from,
+        to: messagePackage.to,
+        crypto: {
+            plaintext: plaintext,
+            messageHash: messagePackage.messageHash,
+            ciphertext: messagePackage.ciphertext,
+            iv: messagePackage.iv,
+            encryptedSymmetricKey: messagePackage.encryptedSymmetricKey,
+            signature: messagePackage.signature
+        },
+        validations: validations,
+        certificate: messagePackage.senderCertificate
+    };
+
+    messageHistory[user].push(messageItem);
+    renderMessageHistory(user);
+
+    return messageItem;
+}
+
+// Renderiza o histórico de mensagens de um usuário
+function renderMessageHistory(user) {
+    const listElement = document.getElementById(`${user.toLowerCase()}-message-list`);
+    if (!listElement) return;
+
+    listElement.innerHTML = '';
+
+    messageHistory[user].forEach(msg => {
+        const messageEl = createMessageElement(msg);
+        listElement.appendChild(messageEl);
+    });
+
+    // Scroll para o final
+    listElement.scrollTop = listElement.scrollHeight;
+}
+
+// Cria elemento DOM de uma mensagem
+function createMessageElement(messageItem) {
+    const div = document.createElement('div');
+    div.className = `message-item ${messageItem.direction}`;
+
+    const time = new Date(messageItem.timestamp).toLocaleTimeString('pt-BR');
+    const directionText = messageItem.direction === 'sent' ? '📤 Enviado' : '📥 Recebido';
+    const directionInfo = messageItem.direction === 'sent'
+        ? `para ${messageItem.to}`
+        : `de ${messageItem.from}`;
+
+    // Cria badges de validação
+    let validationBadges = '';
+    if (Object.keys(messageItem.validations).length > 0) {
+        const labels = {
+            certificateValid: 'Certificado',
+            signatureValid: 'Assinatura',
+            integrityValid: 'Integridade'
+        };
+
+        validationBadges = Object.entries(messageItem.validations)
+            .map(([key, value]) => {
+                const status = value ? 'valid' : 'invalid';
+                const icon = value ? '✓' : '✗';
+                return `<span class="validation-badge ${status}">${icon} ${labels[key]}</span>`;
+            })
+            .join('');
+    }
+
+    div.innerHTML = `
+        <div class="message-header">
+            <span class="message-direction">${directionText} ${directionInfo}</span>
+            <span class="message-time">${time}</span>
+        </div>
+
+        <div class="message-content">
+            <p class="plaintext">${escapeHtml(messageItem.plaintext)}</p>
+        </div>
+
+        ${validationBadges ? `<div class="message-validation">${validationBadges}</div>` : ''}
+
+        <button class="btn-expand-crypto" onclick="toggleCryptoDetails('${messageItem.id}')">
+            ⚙️ Ver Detalhes Criptográficos
+        </button>
+
+        <div class="crypto-details" id="crypto-${messageItem.id}" style="display: none;">
+            ${createCryptoDetailsHTML(messageItem)}
+        </div>
+    `;
+
+    return div;
+}
+
+// Cria HTML dos detalhes criptográficos
+function createCryptoDetailsHTML(messageItem) {
+    const crypto = messageItem.crypto;
+    const cert = messageItem.certificate;
+
+    return `
+        <div class="crypto-section">
+            <h5>📝 Mensagem Original (Plaintext)</h5>
+            <div class="crypto-value">${escapeHtml(crypto.plaintext)}</div>
+        </div>
+
+        <div class="crypto-section">
+            <h5>🔐 Hash SHA-256 (Integridade)</h5>
+            <div class="crypto-value">${crypto.messageHash}</div>
+        </div>
+
+        <div class="crypto-section">
+            <h5>🔒 Ciphertext (AES-256-CBC)</h5>
+            <div class="crypto-value">${crypto.ciphertext}</div>
+        </div>
+
+        <div class="crypto-section">
+            <h5>🎲 IV (Initialization Vector)</h5>
+            <div class="crypto-value">${crypto.iv}</div>
+        </div>
+
+        <div class="crypto-section">
+            <h5>🔑 Chave Simétrica Criptografada (RSA)</h5>
+            <div class="crypto-value">${crypto.encryptedSymmetricKey}</div>
+        </div>
+
+        <div class="crypto-section">
+            <h5>✍️ Assinatura Digital (RSA + SHA-256)</h5>
+            <div class="crypto-value">${crypto.signature}</div>
+        </div>
+
+        <div class="crypto-section">
+            <h5>📜 Certificado Digital</h5>
+            <div class="cert-info">
+                <p><strong>Titular:</strong> ${cert.subject}</p>
+                <p><strong>Emissor:</strong> ${cert.issuer}</p>
+                <p><strong>Serial:</strong> ${cert.serialNumber}</p>
+                <p><strong>Emitido em:</strong> ${cert.issuedAt}</p>
+                <p><strong>Expira em:</strong> ${cert.expiresAt}</p>
+            </div>
+        </div>
+    `;
+}
+
+// Alterna visibilidade dos detalhes criptográficos
+function toggleCryptoDetails(messageId) {
+    const detailsDiv = document.getElementById(`crypto-${messageId}`);
+    const button = event.target;
+
+    if (detailsDiv.style.display === 'none') {
+        detailsDiv.style.display = 'block';
+        button.textContent = '⬆️ Ocultar Detalhes Criptográficos';
+    } else {
+        detailsDiv.style.display = 'none';
+        button.textContent = '⚙️ Ver Detalhes Criptográficos';
+    }
+}
+
+// Limpa o histórico de mensagens de um usuário
+function clearMessageHistory(user) {
+    messageHistory[user] = [];
+    renderMessageHistory(user);
+    addLog(`Histórico de ${user} limpo.`, 'info');
+}
+
+// Atualiza as validações da última mensagem recebida
+function updateLastMessageValidations(user, validations, plaintextIfFailed) {
+    const history = messageHistory[user];
+    if (history.length === 0) return;
+
+    // Encontra a última mensagem recebida
+    for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].direction === 'received') {
+            history[i].validations = validations;
+            // Se falhou, atualiza o plaintext
+            if (plaintextIfFailed && !validations.signatureValid) {
+                history[i].plaintext = plaintextIfFailed;
+            }
+            break;
+        }
+    }
+
+    renderMessageHistory(user);
+}
+
+// Helper: Escape HTML para prevenir XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Funções de API
 async function sendMessage(sender, recipient, message) {
     try {
@@ -113,15 +312,20 @@ async function sendMessage(sender, recipient, message) {
             const senderStatus = sender === 'Alice' ? aliceStatus : bobStatus;
             updateStatus(
                 senderStatus,
-                `✓ Mensagem criptografada e enviada para ${recipient}!`,
+                `✓ Mensagem enviada para ${recipient}!`,
                 'success'
             );
 
-            // Habilita botão de receber
-            if (recipient === 'Bob') {
-                receiveBobBtn.disabled = false;
-                tamperMessageBtn.disabled = false;
-            }
+            // NOVO: Adiciona mensagem ao histórico do remetente
+            addToMessageHistory(sender, 'sent', message, data.messagePackage);
+
+            // NOVO: Adiciona mensagem ao histórico do destinatário (sem validações ainda)
+            addToMessageHistory(recipient, 'received', message, data.messagePackage, {});
+
+            // NOVO: Automaticamente descriptografa e valida a mensagem no destinatário
+            setTimeout(async () => {
+                await receiveMessage(recipient, data.messagePackage);
+            }, 500);
 
             return true;
         } else {
@@ -165,56 +369,24 @@ async function receiveMessage(recipient, messagePackage) {
                 `✓ Mensagem recebida e descriptografada: "${data.message}"`,
                 'success'
             );
+
+            // NOVO: Atualiza validações da última mensagem recebida
+            updateLastMessageValidations(recipient, data.validations);
         } else {
             updateStatus(
                 recipientStatus,
                 `✗ Falha na validação: ${data.errors.join(', ')}`,
                 'error'
             );
-        }
 
-        // Desabilita botões
-        receiveBobBtn.disabled = true;
-        tamperMessageBtn.disabled = true;
+            // NOVO: Atualiza validações com falha
+            updateLastMessageValidations(recipient, data.validations, '[Mensagem rejeitada - adulterada]');
+        }
 
         return data.success;
     } catch (error) {
         addLog(`Erro ao receber mensagem: ${error.message}`, 'error');
         return false;
-    }
-}
-
-async function tamperMessage() {
-    try {
-        addLog('⚠️ SIMULANDO ATAQUE: Adulterando mensagem...', 'error');
-
-        const response = await fetch('/api/tamper-message', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ messagePackage: currentMessagePackage })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            addLog(`⚠️ ${data.warning}`, 'error');
-            currentMessagePackage = data.tamperedPackage;
-
-            updateStatus(
-                bobStatus,
-                'Mensagem adulterada. Tentando receber mesmo assim...',
-                'error'
-            );
-
-            // Aguarda 1 segundo e tenta receber
-            setTimeout(async () => {
-                await receiveMessage(currentRecipient, currentMessagePackage);
-            }, 1000);
-        }
-    } catch (error) {
-        addLog(`Erro ao adulterar mensagem: ${error.message}`, 'error');
     }
 }
 
@@ -240,16 +412,18 @@ async function resetSystem() {
             bobStatus.textContent = '';
             bobStatus.className = 'status-box';
 
-            // Desabilita botões
-            receiveBobBtn.disabled = true;
-            tamperMessageBtn.disabled = true;
-
             // Oculta validações
             hideValidations();
 
             // Limpa logs e adiciona mensagem
             clearLogs();
             addLog('🔄 Sistema reiniciado com sucesso. Novas chaves RSA geradas.', 'success');
+
+            // NOVO: Limpa históricos de mensagens
+            messageHistory.Alice = [];
+            messageHistory.Bob = [];
+            renderMessageHistory('Alice');
+            renderMessageHistory('Bob');
         }
     } catch (error) {
         addLog(`Erro ao reiniciar sistema: ${error.message}`, 'error');
@@ -288,38 +462,25 @@ sendBobToAliceBtn.addEventListener('click', async () => {
     addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
     addLog('🚀 Bob iniciando envio de mensagem para Alice...', 'info');
 
-    await sendMessage('Bob', 'Alice', message);
-
-    // Para Bob enviando para Alice, auto-recebe
-    setTimeout(async () => {
-        addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-        addLog('📨 Alice recebendo mensagem de Bob...', 'info');
-        await receiveMessage('Alice', currentMessagePackage);
-    }, 500);
+    const success = await sendMessage('Bob', 'Alice', message);
 
     sendBobToAliceBtn.disabled = false;
 });
 
-receiveBobBtn.addEventListener('click', async () => {
-    receiveBobBtn.disabled = true;
-    tamperMessageBtn.disabled = true;
-
-    addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
-    addLog('📨 Bob recebendo mensagem de Alice...', 'info');
-
-    await receiveMessage(currentRecipient, currentMessagePackage);
-});
-
-tamperMessageBtn.addEventListener('click', async () => {
-    tamperMessageBtn.disabled = true;
-    receiveBobBtn.disabled = true;
-
-    addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'error');
-
-    await tamperMessage();
-});
-
 clearLogsBtn.addEventListener('click', clearLogs);
+
+// NOVO: Event listeners para limpar histórico
+document.getElementById('clear-alice-history').addEventListener('click', () => {
+    if (confirm('Deseja limpar o histórico de mensagens de Alice?')) {
+        clearMessageHistory('Alice');
+    }
+});
+
+document.getElementById('clear-bob-history').addEventListener('click', () => {
+    if (confirm('Deseja limpar o histórico de mensagens de Bob?')) {
+        clearMessageHistory('Bob');
+    }
+});
 
 resetSystemBtn.addEventListener('click', async () => {
     if (confirm('Deseja reiniciar o sistema? Novas chaves serão geradas.')) {
